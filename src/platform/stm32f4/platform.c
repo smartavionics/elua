@@ -1609,6 +1609,59 @@ int platform_adc_start_sequence( )
 #endif // ifdef BUILD_ADC
 
 // ****************************************************************************
+// DAC functions
+
+#ifdef BUILD_DAC
+
+static uint32_t alignments[NUM_DAC] = { DAC_Align_8b_R, DAC_Align_8b_R };
+
+void platform_dac_init( unsigned id, unsigned bits, unsigned left_aligned ) {
+  unsigned dac_channel = 0;
+  GPIO_InitTypeDef GPIO_init_struct;
+  GPIO_init_struct.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_init_struct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  switch(id) {
+  case 0:
+    dac_channel = DAC_Channel_1;
+    GPIO_init_struct.GPIO_Pin = GPIO_Pin_4;
+    break;
+  case 1:
+    dac_channel = DAC_Channel_2;
+    GPIO_init_struct.GPIO_Pin = GPIO_Pin_5;
+    break;
+  default:
+    return;
+  }
+  GPIO_Init(GPIOA, &GPIO_init_struct);
+  if(bits == 8)
+    alignments[id] = DAC_Align_8b_R;
+  else if(bits == 12) {
+    alignments[id] = left_aligned ? DAC_Align_12b_L : DAC_Align_12b_R;
+  }
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
+  DAC_DeInit();
+  DAC_InitTypeDef dac_init_struct;
+  DAC_StructInit(&dac_init_struct);
+  DAC_Init(dac_channel, &dac_init_struct);
+  DAC_Cmd(dac_channel, ENABLE);
+}
+
+void platform_dac_putsample( unsigned id, u16 val ) {
+  switch(id) {
+  case 0:
+    DAC_SetChannel1Data(alignments[id], val);
+    break;
+  case 1:
+    DAC_SetChannel2Data(alignments[id], val);
+    break;
+  default:
+    return;
+  }
+}
+
+#endif // ifdef BUILD_DAC
+
+// ****************************************************************************
 // Flash access functions
 
 #ifdef BUILD_WOFS

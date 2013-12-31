@@ -279,6 +279,13 @@ u32  platform_adc_is_done( unsigned id );
 void platform_adc_set_timer( unsigned id, u32 timer );
 
 // *****************************************************************************
+// The platform DAC functions
+
+int  platform_dac_exists( unsigned id );
+void platform_dac_init( unsigned id, unsigned bits, unsigned left_aligned );
+void platform_dac_putsample( unsigned id, u16 val );
+
+// *****************************************************************************
 // I2C platform interface
 
 // I2C speed

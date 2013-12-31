@@ -14,7 +14,8 @@ return {
     adc = { buf_size = 2 },
     xmodem = true,
     cints = true, 
-    luaints = true
+    luaints = true,
+    dac = true
   },
   config = {
     egc = { mode = "alloc" },
