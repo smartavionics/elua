@@ -27,7 +27,7 @@ local elua_generic_modules = {
   bit = {}, 
   can = { guards = { "NUM_CAN > 0" } }, 
   cpu = {},
-  dac = { guards = { "NUM_DAC > 0" } },
+  dac = { guards = { "BUILD_DAC", "NUM_DAC > 0" } },
   elua = {}, 
   i2c = { guards = { "NUM_I2C > 0" } },
   pack = {}, 
