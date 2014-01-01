@@ -284,6 +284,7 @@ void platform_adc_set_timer( unsigned id, u32 timer );
 int  platform_dac_exists(unsigned id);
 void platform_dac_init(unsigned id, unsigned bits, unsigned left_aligned);
 void platform_dac_putsample(unsigned id, u16 val);
+int  platform_dac_check_timer_id(unsigned id, unsigned timer_id);
 
 // *****************************************************************************
 // I2C platform interface

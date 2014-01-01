@@ -1659,6 +1659,10 @@ void platform_dac_putsample(unsigned id, u16 val) {
   }
 }
 
+int platform_dac_check_timer_id(unsigned id, unsigned timer_id) {
+  return timer_id >= 1 && timer_id <= 4;
+}
+
 #endif // ifdef BUILD_DAC
 
 // ****************************************************************************

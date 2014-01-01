@@ -95,6 +95,7 @@ static int dac_putsamples(lua_State *L) {
 
   timer_id = luaL_checkinteger(L, 2);
   MOD_CHECK_TIMER( timer_id );
+  MOD_CHECK_RES_ID( dac, dac_id, timer, timer_id );
 
   rate = luaL_checkinteger(L, 3);
   if(rate == 0)
@@ -149,6 +150,7 @@ static int dac_playwavfile(lua_State *L) {
 
   timer_id = luaL_checkinteger(L, 2);
   MOD_CHECK_TIMER( timer_id );
+  MOD_CHECK_RES_ID( dac, dac_id, timer, timer_id );
 
   wavfilename = luaL_checklstring(L, 3, NULL);
   if(!wavfilename)
