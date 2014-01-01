@@ -1659,62 +1659,6 @@ void platform_dac_putsample(unsigned id, u16 val) {
   }
 }
 
-static elua_int_c_handler dac_prev_timer_handler;
-static volatile const char *dac_samples;
-static unsigned dac_bytes_per_sample;
-static unsigned dac_bias;
-static volatile unsigned dac_num_samples;
-static unsigned dac_ids[NUM_TIMER];
-
-static void dac_timer_int_handler(elua_int_resnum resnum) {
-  unsigned dac_id = dac_ids[resnum];
-
-  if(dac_id) {
-    --dac_id;
-    if(dac_num_samples > 0) {
-      if(dac_bytes_per_sample == 1) {
-        platform_dac_putsample(dac_id, dac_bias + *dac_samples++);
-      }
-      else if((unsigned)dac_samples & 1) {
-        uint16_t val = *dac_samples++;
-        val |= *dac_samples++ << 8;
-        platform_dac_putsample(dac_id, dac_bias + val);
-      }
-      else {
-        platform_dac_putsample(dac_id, dac_bias + *(uint16_t *)dac_samples);
-        dac_samples += 2;
-      }
-      --dac_num_samples;
-    }
-  }
-  else if(dac_prev_timer_handler)
-    dac_prev_timer_handler(resnum);
-}
-
-int platform_dac_putsamples(unsigned dac_id, unsigned timer_id, unsigned rate, const char *samples, unsigned bytes_per_sample, unsigned num_samples, unsigned bias) {
-  int result;
-
-  dac_samples = samples;
-  dac_bytes_per_sample = bytes_per_sample;
-  dac_bias = bias;
-  dac_num_samples = num_samples;
-  dac_ids[timer_id] = dac_id + 1;
-
-  dac_prev_timer_handler = elua_int_set_c_handler(INT_TMR_MATCH, dac_timer_int_handler);
-  result = platform_timer_set_match_int(timer_id, 1000000 / rate, PLATFORM_TIMER_INT_CYCLIC);
-  if(result != PLATFORM_TIMER_INT_OK)
-    return -1;
-
-  while(dac_num_samples != 0) {
-    __WFI;
-  }
-
-  platform_timer_set_match_int(timer_id, 0, PLATFORM_TIMER_INT_CYCLIC);
-  elua_int_set_c_handler(INT_TMR_MATCH, dac_prev_timer_handler);
-
-  return 0;
-}
-
 #endif // ifdef BUILD_DAC
 
 // ****************************************************************************
