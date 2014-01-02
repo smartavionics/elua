@@ -60,7 +60,10 @@ static struct {
 static void dac_timer_int_handler(elua_int_resnum resnum) {
   if(resnum == dac_state.timer_id) {
     // the interrupt is for our timer
-    if(dac_state.next_out != dac_state.next_in) {
+    int available = dac_state.next_in - dac_state.next_out;
+    if(available < 0)
+      available += dac_state.sample_buffer_size;
+    if(available >= dac_state.stride) {
       u16 sample;
       if(dac_state.bytes_per_sample == 1) {
         sample = dac_state.bias + dac_state.sample_buffer[dac_state.next_out];
