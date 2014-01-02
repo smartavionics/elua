@@ -1615,7 +1615,7 @@ int platform_adc_start_sequence( )
 
 static uint32_t alignments[NUM_DAC] = { DAC_Align_8b_R, DAC_Align_8b_R };
 
-void platform_dac_init(unsigned id, unsigned bits, unsigned left_aligned) {
+int platform_dac_init(unsigned id, unsigned bits_per_sample, unsigned options) {
   unsigned dac_channel = 0;
   GPIO_InitTypeDef GPIO_init_struct;
   GPIO_init_struct.GPIO_Mode = GPIO_Mode_AN;
@@ -1630,13 +1630,21 @@ void platform_dac_init(unsigned id, unsigned bits, unsigned left_aligned) {
     GPIO_init_struct.GPIO_Pin = GPIO_Pin_5;
     break;
   default:
-    return;
+    return DAC_INIT_BAD_ID;
   }
   GPIO_Init(GPIOA, &GPIO_init_struct);
-  if(bits == 8)
+  switch(bits_per_sample) {
+  case 8:
     alignments[id] = DAC_Align_8b_R;
-  else if(bits == 12) {
-    alignments[id] = left_aligned ? DAC_Align_12b_L : DAC_Align_12b_R;
+    break;
+  case 12:
+    alignments[id] = DAC_Align_12b_R;
+    break;
+  case 16:
+    alignments[id] = DAC_Align_12b_L;
+    break;
+  default:
+    return DAC_INIT_BAD_BITS_PER_SAMPLE;
   }
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
   DAC_DeInit();
@@ -1644,18 +1652,22 @@ void platform_dac_init(unsigned id, unsigned bits, unsigned left_aligned) {
   DAC_StructInit(&dac_init_struct);
   DAC_Init(dac_channel, &dac_init_struct);
   DAC_Cmd(dac_channel, ENABLE);
+  return 0;
 }
 
-void platform_dac_putsample(unsigned id, u16 val) {
-  switch(id) {
-  case 0:
-    DAC_SetChannel1Data(alignments[id], val);
-    break;
+void platform_dac_put_sample(unsigned channel_mask, u16 *data) {
+  switch(channel_mask) {
   case 1:
-    DAC_SetChannel2Data(alignments[id], val);
+    DAC_SetChannel1Data(alignments[0], data[0]);
+    break;
+  case 2:
+    DAC_SetChannel2Data(alignments[1], data[0]);
+    break;
+  case 3:
+    DAC_SetDualChannelData(alignments[0], data[1], data[0]);
     break;
   default:
-    return;
+    break;
   }
 }
 

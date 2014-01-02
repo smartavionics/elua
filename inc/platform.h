@@ -279,11 +279,20 @@ u32  platform_adc_is_done( unsigned id );
 void platform_adc_set_timer( unsigned id, u32 timer );
 
 // *****************************************************************************
-// The platform DAC functions
+// The DAC functions
 
+// DAC common functions
 int  platform_dac_exists(unsigned id);
-void platform_dac_init(unsigned id, unsigned bits, unsigned left_aligned);
-void platform_dac_putsample(unsigned id, u16 val);
+
+// DAC platform specific functions
+
+#define DAC_INIT_OK                   0
+#define DAC_INIT_BAD_ID              -1
+#define DAC_INIT_BAD_BITS_PER_SAMPLE -2
+#define DAC_INIT_BAD_OPTION          -3
+
+int platform_dac_init(unsigned id, unsigned bits_per_sample, unsigned options);
+void platform_dac_put_sample(unsigned channel_mask, u16 *data);
 int  platform_dac_check_timer_id(unsigned id, unsigned timer_id);
 
 // *****************************************************************************
