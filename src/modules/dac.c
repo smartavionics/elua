@@ -82,22 +82,25 @@ static void dac_timer_int_handler(elua_int_resnum resnum) {
   }
 }
 
-// Lua: putsamples( samples, rate, [id, [timer_id, [bytes_per_sample, [bias, [offset, [num_samples]]]]]] )
+// Lua: putsamples( id, samples, rate, [timer_id, [bytes_per_sample, [bias, [offset, [num_samples]]]]] )
 static int dac_putsamples(lua_State *L) {
 
+  dac_state.dac_id = luaL_checkinteger(L, 1);
+  MOD_CHECK_ID(dac, dac_state.dac_id);
+
   size_t byte_count;
-  const char *samples = luaL_checklstring(L, 1, &byte_count);
+  const char *samples = luaL_checklstring(L, 2, &byte_count);
   if(!samples)
     return 0;
 
-  unsigned rate = luaL_checkinteger(L, 2);
+  unsigned rate = luaL_checkinteger(L, 3);
   if(rate == 0)
     luaL_error(L, "rate must be > 0");
 
-  dac_state.dac_id = luaL_optinteger(L, 3, 0);
-  MOD_CHECK_ID(dac, dac_state.dac_id);
-
-  dac_state.timer_id = luaL_optinteger(L, 4, 1);
+  unsigned default_timer_id = 0;
+  while(default_timer_id < NUM_TIMER && !platform_dac_check_timer_id(dac_state.dac_id, default_timer_id))
+    ++default_timer_id;
+  dac_state.timer_id = luaL_optinteger(L, 4, default_timer_id);
   MOD_CHECK_TIMER(dac_state.timer_id);
   MOD_CHECK_RES_ID(dac, dac_state.dac_id, timer, dac_state.timer_id);
 
@@ -136,17 +139,20 @@ static int dac_putsamples(lua_State *L) {
   return 0;
 }
 
-// Lua: playwavfile( wavfilename, [id, [timer_id, [sample_buf_size]]] )
+// Lua: playwavfile( id, wavfilename, [timer_id, [sample_buf_size]] )
 static int dac_playwavfile(lua_State *L) {
 
-  const char *wavfilename = luaL_checklstring(L, 1, NULL);
+  dac_state.dac_id = luaL_checkinteger(L, 1);
+  MOD_CHECK_ID(dac, dac_state.dac_id);
+
+  const char *wavfilename = luaL_checklstring(L, 2, NULL);
   if(!wavfilename)
     return 0;
 
-  dac_state.dac_id = luaL_optinteger(L, 2, 0);
-  MOD_CHECK_ID(dac, dac_state.dac_id);
-
-  dac_state.timer_id = luaL_optinteger(L, 3, 1);
+  unsigned default_timer_id = 0;
+  while(default_timer_id < NUM_TIMER && !platform_dac_check_timer_id(dac_state.dac_id, default_timer_id))
+    ++default_timer_id;
+  dac_state.timer_id = luaL_optinteger(L, 3, default_timer_id);
   MOD_CHECK_TIMER(dac_state.timer_id);
   MOD_CHECK_RES_ID(dac, dac_state.dac_id, timer, dac_state.timer_id);
 
