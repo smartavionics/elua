@@ -8,6 +8,8 @@
 #include "platform_conf.h"
 #include "auxmods.h"
 
+#ifdef BUILD_DAC
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -319,3 +321,4 @@ LUALIB_API int luaopen_dac( lua_State *L ) {
   LREGISTER( L, AUXLIB_ENC, dac_map );
 }  
 
+#endif // BUILD_DAC
