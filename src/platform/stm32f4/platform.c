@@ -1655,7 +1655,7 @@ int platform_dac_init(unsigned id, unsigned bits_per_sample, unsigned options) {
   return 0;
 }
 
-void platform_dac_put_sample(unsigned channel_mask, u16 *data) {
+void platform_dac_put_sample(unsigned channel_mask, unsigned *data) {
   switch(channel_mask & 3) {
   case 1:
     DAC_SetChannel1Data(alignments[0], data[0]);

@@ -70,7 +70,7 @@ static void dac_timer_int_handler( elua_int_resnum resnum )
       available += dac_state.sample_buffer_size;
     if ( available >= dac_state.stride )
     {
-      u16 dac_vals[NUM_DAC];
+      unsigned dac_vals[NUM_DAC];
       unsigned dac_mask = 0;
       int i;
       for ( i = 0; i < dac_state.channels; ++i )
