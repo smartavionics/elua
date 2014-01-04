@@ -31,15 +31,23 @@ static int dac_setup( lua_State *L )
   return 0;
 }
 
-// Lua: putsample( dac_id, val )
+// Lua: putsample( dac_id, val, ... )
 static int dac_putsample( lua_State  *L )
 {
-  unsigned id = luaL_checkinteger( L, 1 );
-  MOD_CHECK_ID( dac, id );
+  unsigned dac_id = luaL_checkinteger( L, 1 );
+  MOD_CHECK_ID( dac, dac_id );
 
-  u16 val = luaL_checkinteger( L, 2 );
+  unsigned channel_mask = 1 << dac_id;
+  unsigned vals[NUM_DAC] = { luaL_checkinteger( L, 2 ) };
 
-  platform_dac_put_sample( 1 << id, &val );
+  unsigned argn;
+  for ( argn = 3; argn <= lua_gettop( L ) && argn - 2 < NUM_DAC; ++argn )
+  {
+    channel_mask |= 1 << ++dac_id;
+    vals[argn - 2] = luaL_checkinteger( L, argn );
+  }
+
+  platform_dac_put_sample( channel_mask, vals );
 
   return 0;
 }
