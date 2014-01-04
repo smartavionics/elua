@@ -15,16 +15,16 @@
 static unsigned bytes_per_sample[NUM_DAC];
 
 // Lua: setup( dac_id, [bits_per_sample] )
-static int dac_setup(lua_State *L) {
-  
-  unsigned id = luaL_checkinteger(L, 1);
-  MOD_CHECK_ID(dac, id);
+static int dac_setup( lua_State *L )
+{
+  unsigned id = luaL_checkinteger( L, 1 );
+  MOD_CHECK_ID( dac, id );
 
-  unsigned bits_per_sample = luaL_optinteger(L, 2, 8);
+  unsigned bits_per_sample = luaL_optinteger( L, 2, 8 );
 
-  int result = platform_dac_init(id, bits_per_sample, 0);
-  if(result != DAC_INIT_OK)
-    return luaL_error(L, "DAC initialisation failed (%d)", result);
+  int result = platform_dac_init( id, bits_per_sample, 0 );
+  if ( result != DAC_INIT_OK )
+    return luaL_error( L, "DAC initialisation failed (%d)", result );
 
   bytes_per_sample[id] = (bits_per_sample + 7) / 8;
 
@@ -32,19 +32,20 @@ static int dac_setup(lua_State *L) {
 }
 
 // Lua: putsample( dac_id, val )
-static int dac_putsample(lua_State  *L) {
-  
-  unsigned id = luaL_checkinteger(L, 1);
-  MOD_CHECK_ID(dac, id);
+static int dac_putsample( lua_State  *L )
+{
+  unsigned id = luaL_checkinteger( L, 1 );
+  MOD_CHECK_ID( dac, id );
 
-  u16 val = luaL_checkinteger(L, 2);
+  u16 val = luaL_checkinteger( L, 2 );
 
-  platform_dac_put_sample(1 << id, &val);
+  platform_dac_put_sample( 1 << id, &val );
 
   return 0;
 }
 
-volatile static struct {
+volatile static struct
+{
   elua_int_c_handler prev_timer_int_handler;
   char *sample_buffer;            // circular buffer holding sample data
   unsigned sample_buffer_size;    // size of buffer in bytes
@@ -59,76 +60,84 @@ volatile static struct {
   unsigned num_underflows;        // number of times the buffer underflowed
 } dac_state;
 
-static void dac_timer_int_handler(elua_int_resnum resnum) {
-  if(resnum == dac_state.timer_id) {
+static void dac_timer_int_handler( elua_int_resnum resnum )
+{
+  if ( resnum == dac_state.timer_id )
+  {
     // the interrupt is for our timer
     int available = dac_state.next_in - dac_state.next_out;
-    if(available < 0)
+    if ( available < 0 )
       available += dac_state.sample_buffer_size;
-    if(available >= dac_state.stride) {
+    if ( available >= dac_state.stride )
+    {
       u16 dac_vals[NUM_DAC];
       unsigned dac_mask = 0;
       int i;
-      for(i = 0; i < dac_state.channels; ++i) {
+      for ( i = 0; i < dac_state.channels; ++i )
+      {
         dac_mask |= 1 << (dac_state.dac_id + i);
-        if(bytes_per_sample[dac_state.dac_id + i] == 1) {
+        if( bytes_per_sample[dac_state.dac_id + i] == 1 )
+        {
           dac_vals[i] = dac_state.bias + dac_state.sample_buffer[dac_state.next_out];
           ++dac_state.next_out;
         }
-        else {
+        else
+        {
           dac_vals[i] = dac_state.bias + *(s16 *)(dac_state.sample_buffer + dac_state.next_out);
           dac_state.next_out += 2;
         }
-        if(dac_state.next_out >= dac_state.sample_buffer_size)
+        if ( dac_state.next_out >= dac_state.sample_buffer_size )
           dac_state.next_out -= dac_state.sample_buffer_size;
       }
-      platform_dac_put_sample(dac_mask, dac_vals);
+      platform_dac_put_sample( dac_mask, dac_vals );
       ++dac_state.num_output;
     }
     else
       ++dac_state.num_underflows;
   }
-  else {
+  else
+  {
     // the interrupt is for another timer
-    if(dac_state.prev_timer_int_handler)
+    if ( dac_state.prev_timer_int_handler )
       dac_state.prev_timer_int_handler(resnum);
   }
 }
 
 // Lua: num_samples_output, num_underflows = putsamples( dac_id, data_source, rate, [bits_per_sample, [channels, [bias, [timer_id]]]] )
-static int dac_putsamples(lua_State *L) {
+static int dac_putsamples( lua_State *L )
+{
+  dac_state.dac_id = luaL_checkinteger( L, 1 );
+  MOD_CHECK_ID( dac, dac_state.dac_id );
 
-  dac_state.dac_id = luaL_checkinteger(L, 1);
-  MOD_CHECK_ID(dac, dac_state.dac_id);
+  unsigned data_source_type = lua_type( L, 2 );
+  if ( data_source_type != LUA_TSTRING && data_source_type != LUA_TTABLE && data_source_type != LUA_TFUNCTION )
+    return luaL_error( L, "data_source must either be an array of integers, a string or a function that returns a string" );
 
-  unsigned data_source_type = lua_type(L, 2);
-  if(data_source_type != LUA_TSTRING && data_source_type != LUA_TTABLE && data_source_type != LUA_TFUNCTION)
-    return luaL_error(L, "data_source must either be an array of integers, a string or a function that returns a string");
+  unsigned rate = luaL_checkinteger( L, 3 );
+  if( rate == 0 )
+    return luaL_error( L, "rate must be > 0" );
 
-  unsigned rate = luaL_checkinteger(L, 3);
-  if(rate == 0)
-    return luaL_error(L, "rate must be > 0");
+  unsigned bits_per_sample = luaL_optinteger( L, 4, 8 );
 
-  unsigned bits_per_sample = luaL_optinteger(L, 4, 8);
-
-  dac_state.channels = luaL_optinteger(L, 5, 1);
-  if(dac_state.channels < 1 || (dac_state.dac_id + dac_state.channels > NUM_DAC))
-    return luaL_error(L, "channels must be between 1 and %d", NUM_DAC - dac_state.dac_id);
-  dac_state.bias = luaL_optinteger(L, 6, 0);
+  dac_state.channels = luaL_optinteger( L, 5, 1 );
+  if ( dac_state.channels < 1 || (dac_state.dac_id + dac_state.channels > NUM_DAC) )
+    return luaL_error( L, "channels must be between 1 and %d", NUM_DAC - dac_state.dac_id );
+  dac_state.bias = luaL_optinteger( L, 6, 0 );
 
   unsigned default_timer_id = 0;
-  while(default_timer_id < NUM_TIMER && !platform_dac_check_timer_id(dac_state.dac_id, default_timer_id))
+  while ( default_timer_id < NUM_TIMER && !platform_dac_check_timer_id( dac_state.dac_id, default_timer_id ) )
     ++default_timer_id;
-  dac_state.timer_id = luaL_optinteger(L, 7, default_timer_id);
-  MOD_CHECK_TIMER(dac_state.timer_id);
-  MOD_CHECK_RES_ID(dac, dac_state.dac_id, timer, dac_state.timer_id);
+  dac_state.timer_id = luaL_optinteger( L, 7, default_timer_id );
+  MOD_CHECK_TIMER( dac_state.timer_id );
+  MOD_CHECK_RES_ID( dac, dac_state.dac_id, timer, dac_state.timer_id );
 
   {
     int i;
-    for(i = 0; i < dac_state.channels; ++i) {
-      int result = platform_dac_init(dac_state.dac_id + i, bits_per_sample, 0);
-      if(result != DAC_INIT_OK)
-        return luaL_error(L, "DAC initialisation failed (%d)", result);
+    for ( i = 0; i < dac_state.channels; ++i )
+    {
+      int result = platform_dac_init( dac_state.dac_id + i, bits_per_sample, 0 );
+      if ( result != DAC_INIT_OK )
+        return luaL_error( L, "DAC initialisation failed (%d)", result );
       bytes_per_sample[dac_state.dac_id] = (bits_per_sample + 7) / 8;
     }
   }
@@ -140,132 +149,149 @@ static int dac_putsamples(lua_State *L) {
   dac_state.num_output = 0;
 
   // install our timer interrupt handler
-  dac_state.prev_timer_int_handler = elua_int_set_c_handler(INT_TMR_MATCH, dac_timer_int_handler);
+  dac_state.prev_timer_int_handler = elua_int_set_c_handler( INT_TMR_MATCH, dac_timer_int_handler );
   // start cyclic timer interrupts
-  int result = platform_timer_set_match_int(dac_state.timer_id, 1000000 / rate, PLATFORM_TIMER_INT_CYCLIC);
-  if(result != PLATFORM_TIMER_INT_OK)
-    return luaL_error(L, "Failed to start DAC timer (%d)", result);
+  int result = platform_timer_set_match_int( dac_state.timer_id, 1000000 / rate, PLATFORM_TIMER_INT_CYCLIC );
+  if( result != PLATFORM_TIMER_INT_OK )
+    return luaL_error( L, "Failed to start DAC timer (%d)", result );
 
-  if(data_source_type == LUA_TTABLE) {
+  if( data_source_type == LUA_TTABLE )
+  {
     // transfer the values in the table into a small circular buffer
-    int num_vals_in_table = lua_objlen(L, 2);
+    int num_vals_in_table = lua_objlen( L, 2 );
     char small_buffer[16];
     dac_state.sample_buffer = small_buffer;
-    dac_state.sample_buffer_size = sizeof(small_buffer);
+    dac_state.sample_buffer_size = sizeof( small_buffer );
     // copy values from table into circular buffer
     int n = 1;
-    while(n <= num_vals_in_table) {
+    while ( n <= num_vals_in_table )
+    {
       int space = dac_state.next_out - dac_state.next_in;
-      if(space <= 0)
+      if ( space <= 0 )
         space += dac_state.sample_buffer_size;
-      if(space > dac_state.stride) {
-        if(n == 1)
+      if ( space > dac_state.stride )
+      {
+        if ( n == 1 )
           dac_state.num_underflows = 0;
-        lua_rawgeti(L, 2, n++);
-        unsigned val = luaL_checkinteger(L, -1);
-        lua_pop(L, 1);
+        lua_rawgeti( L, 2, n++ );
+        unsigned val = luaL_checkinteger( L, -1 );
+        lua_pop( L, 1 );
         int i;
-        for(i = 0; i < dac_state.stride; ++i) {
+        for ( i = 0; i < dac_state.stride; ++i )
+        {
           // FIXME - cope with big endian format?
           dac_state.sample_buffer[dac_state.next_in] = val;
           val >>= 8;
-          if(++dac_state.next_in >= dac_state.sample_buffer_size)
+          if ( ++dac_state.next_in >= dac_state.sample_buffer_size )
             dac_state.next_in -= dac_state.sample_buffer_size;
         }
       }
     }
   }
-  else if(data_source_type == LUA_TFUNCTION) {
+  else if ( data_source_type == LUA_TFUNCTION )
+  {
     // the function is expected to return a string of data each time it is called
     // until there is no more data and then the function should return nil or an empty string
     dac_state.sample_buffer = 0;
-    for(;;) {
+    for (;;)
+    {
       // call function to get next chunk of data
-      lua_pushvalue(L, 2);
-      lua_call(L, 0, 1);
-      if(lua_isnoneornil(L, -1)) {
+      lua_pushvalue( L, 2 );
+      lua_call( L, 0, 1 );
+      if ( lua_isnoneornil( L, -1 ) )
+      {
         // function returned nil
-        lua_pop(L, 1);
+        lua_pop( L, 1 );
         break;
       }
       size_t byte_count = 0;
-      char *chunk = (char *)luaL_checklstring(L, -1, &byte_count);
-      if(byte_count == 0) {
+      char *chunk = (char *)luaL_checklstring( L, -1, &byte_count );
+      if ( byte_count == 0 )
+      {
         // function returned empty string
-        lua_pop(L, 1);
+        lua_pop( L, 1 );
         break;
       }
-      if(!dac_state.sample_buffer) {
+      if ( !dac_state.sample_buffer )
+      {
         // handle the first chunk of data by allocating a buffer of the same
         // size and copying all the data into the buffer
         dac_state.sample_buffer_size = byte_count;
-        dac_state.sample_buffer = malloc(byte_count);
-        if(!dac_state.sample_buffer) {
-          lua_pop(L, 1);
-          luaL_error(L, "Failed to allocate %d byte buffer", byte_count);
+        dac_state.sample_buffer = malloc( byte_count );
+        if ( !dac_state.sample_buffer )
+        {
+          lua_pop( L, 1 );
+          luaL_error( L, "Failed to allocate %d byte buffer", byte_count );
           break;
         }
-        memcpy(dac_state.sample_buffer, chunk, byte_count);
+        memcpy( dac_state.sample_buffer, chunk, byte_count );
         // set next_in to the last byte in buffer so that the
         // interrupt handler starts consuming data
         dac_state.next_in = byte_count - 1;
         // reset underflow counter
         dac_state.num_underflows = 0;
-        while(dac_state.next_out == 0) {
+        while ( dac_state.next_out == 0 )
+        {
           // wait for some data to be consumed
         }
         // now set next_in to zero again which is the correct
         // value as we completely filled the buffer
         dac_state.next_in = 0;
       }
-      else {
+      else
+      {
         // top up circular buffer byte by byte
         int i;
-        for(i = 0; i < byte_count;) {
+        for ( i = 0; i < byte_count; )
+        {
           int space = dac_state.next_out - dac_state.next_in;
-          if(space <= 0)
+          if ( space <= 0 )
             space += dac_state.sample_buffer_size;
-          if(space > 1) {
-            //if(i == 0)
-            //  printf("Buffer space now %d\n", space);
+          if ( space > 1 )
+          {
+            //if ( i == 0 )
+            //  printf( "Buffer space now %d\n", space );
             dac_state.sample_buffer[dac_state.next_in] = chunk[i++];
-            if(++dac_state.next_in >= dac_state.sample_buffer_size)
+            if ( ++dac_state.next_in >= dac_state.sample_buffer_size )
               dac_state.next_in -= dac_state.sample_buffer_size;
           }
         }
       }
       // discard function result
-      lua_pop(L, 1);
+      lua_pop( L, 1 );
     }
 
-    while(dac_state.next_in != dac_state.next_out) {
+    while ( dac_state.next_in != dac_state.next_out )
+    {
     // wait for buffer to drain
     }
 
     free(dac_state.sample_buffer);
   }
-  else {
+  else
+  {
     // LUA_TSTRING
     // trivial case, just use the string directly
     size_t byte_count = 0;
-    dac_state.sample_buffer = (char *)luaL_checklstring(L, 2, &byte_count);
+    dac_state.sample_buffer = (char *)luaL_checklstring( L, 2, &byte_count );
     dac_state.sample_buffer_size = byte_count + 1;
     dac_state.next_in = byte_count;
     dac_state.num_underflows = 0;
   }
 
-  while(dac_state.next_in != dac_state.next_out) {
+  while ( dac_state.next_in != dac_state.next_out )
+  {
     // wait for buffer to drain
   }
 
   // stop timer interrupts
-  platform_timer_set_match_int(dac_state.timer_id, 0, PLATFORM_TIMER_INT_CYCLIC);
+  platform_timer_set_match_int( dac_state.timer_id, 0, PLATFORM_TIMER_INT_CYCLIC );
   // possibly restore original timer interrupt handler
-  if(dac_state.prev_timer_int_handler)
-    elua_int_set_c_handler(INT_TMR_MATCH, dac_state.prev_timer_int_handler);
+  if ( dac_state.prev_timer_int_handler )
+    elua_int_set_c_handler( INT_TMR_MATCH, dac_state.prev_timer_int_handler );
 
-  lua_pushinteger(L, dac_state.num_output);
-  lua_pushinteger(L, dac_state.num_underflows);
+  lua_pushinteger( L, dac_state.num_output );
+  lua_pushinteger( L, dac_state.num_underflows );
 
   return 2;
 }
@@ -275,13 +301,13 @@ static int dac_putsamples(lua_State *L) {
 
 // Module function map
 const LUA_REG_TYPE dac_map[] = { 
-  { LSTRKEY("setup"),  LFUNCVAL(dac_setup) },
-  { LSTRKEY("putsample"),  LFUNCVAL(dac_putsample) },
-  { LSTRKEY("putsamples"),  LFUNCVAL(dac_putsamples) },
+  { LSTRKEY("setup"),  LFUNCVAL( dac_setup ) },
+  { LSTRKEY("putsample"),  LFUNCVAL( dac_putsample ) },
+  { LSTRKEY("putsamples"),  LFUNCVAL( dac_putsamples ) },
   { LNILKEY, LNILVAL }
 };
 
-LUALIB_API int luaopen_dac(lua_State *L) {
-  LREGISTER(L, AUXLIB_ENC, dac_map);
+LUALIB_API int luaopen_dac( lua_State *L ) {
+  LREGISTER( L, AUXLIB_ENC, dac_map );
 }  
 
