@@ -230,8 +230,11 @@ static int dac_putsamples( lua_State *L )
         dac_state.sample_buffer = malloc( byte_count );
         if ( !dac_state.sample_buffer )
         {
+          // discard function result
           lua_pop( L, 1 );
-          luaL_error( L, "Failed to allocate %d byte buffer", byte_count );
+          luaL_where( L, 1 );
+          fprintf( stderr, "%sFailed to allocate %d byte sample buffer\n", luaL_checklstring( L, -1, 0 ), byte_count );
+          lua_pop( L, 1 );
           break;
         }
         memcpy( dac_state.sample_buffer, chunk, byte_count );
