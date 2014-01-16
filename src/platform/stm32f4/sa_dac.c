@@ -14,8 +14,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define NUM_DAC 2
-
 // *****************************************************************************
 // The DAC functions
 
