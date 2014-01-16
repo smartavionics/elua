@@ -58,9 +58,6 @@ LUALIB_API int ( luaopen_elua )( lua_State *L );
 #define AUXLIB_I2C  "i2c"
 LUALIB_API int ( luaopen_i2c )( lua_State *L );
 
-#define AUXLIB_DAC  "dac"
-LUALIB_API int ( luaopen_dac )( lua_State *L );
-
 // Helper macros
 #define MOD_CHECK_ID( mod, id )\
   if( !platform_ ## mod ## _exists( id ) )\

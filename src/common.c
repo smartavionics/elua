@@ -331,17 +331,6 @@ void platform_adc_set_timer( unsigned id, u32 timer )
 #endif // #ifdef BUILD_ADC
 
 // ****************************************************************************
-// DAC functions
-
-#ifdef BUILD_DAC
-
-int platform_dac_exists(unsigned id) {
-  return id < NUM_DAC;
-}
-
-#endif // ifdef BUILD_DAC
-
-// ****************************************************************************
 // Allocator support
 
 #define MIN_ALIGN         8

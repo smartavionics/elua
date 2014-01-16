@@ -16,7 +16,6 @@
 #define NUM_PWM               4
 #define NUM_ADC               18
 #define NUM_CAN               1
-#define NUM_DAC               2
 
 #define ADC_BIT_RESOLUTION    12
 

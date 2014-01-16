@@ -193,13 +193,6 @@ function init()
       buf_size = at.make_optional( at.int_log2_attr( 'ADC_BUF_SIZE' ) )
     }
   }
-  -- DAC
-  components.dac = {
-    macro = 'BUILD_DAC',
-    --attrs = {
-    --  buf_size = at.make_optional( at.int_log2_attr( 'ADC_BUF_SIZE' ) )
-    --}
-  }
   -- DNS client
   components.dns = { macro = 'BUILD_DNS', needs = 'tcpip' }
   -- DHCP client

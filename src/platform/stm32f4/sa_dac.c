@@ -1,4 +1,4 @@
-// eLua Module for generic DAC support
+// eLua Module for simple DAC support
 
 #include "lua.h"
 #include "lualib.h"
@@ -8,11 +8,100 @@
 #include "platform_conf.h"
 #include "auxmods.h"
 
-#ifdef BUILD_DAC
+#include "stm32f4xx_conf.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#define NUM_DAC 2
+
+// *****************************************************************************
+// The DAC functions
+
+// DAC common functions
+int platform_dac_exists(unsigned id) {
+  return id < NUM_DAC;
+}
+
+// DAC platform specific functions
+
+#define DAC_INIT_OK                   0
+#define DAC_INIT_BAD_ID              -1
+#define DAC_INIT_BAD_BITS_PER_SAMPLE -2
+#define DAC_INIT_BAD_OPTION          -3
+
+int  platform_dac_init( unsigned id, unsigned bits_per_sample, unsigned options );
+void platform_dac_put_sample( unsigned channel_mask, unsigned *data );
+int  platform_dac_check_timer_id( unsigned id, unsigned timer_id );
+
+// ****************************************************************************
+// platform DAC functions
+
+static uint32_t alignments[NUM_DAC] = { DAC_Align_8b_R, DAC_Align_8b_R };
+
+int platform_dac_init(unsigned id, unsigned bits_per_sample, unsigned options) {
+  unsigned dac_channel = 0;
+  GPIO_InitTypeDef GPIO_init_struct;
+  GPIO_init_struct.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_init_struct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  switch(id) {
+  case 0:
+    dac_channel = DAC_Channel_1;
+    GPIO_init_struct.GPIO_Pin = GPIO_Pin_4;
+    break;
+  case 1:
+    dac_channel = DAC_Channel_2;
+    GPIO_init_struct.GPIO_Pin = GPIO_Pin_5;
+    break;
+  default:
+    return DAC_INIT_BAD_ID;
+  }
+  GPIO_Init(GPIOA, &GPIO_init_struct);
+  switch(bits_per_sample) {
+  case 8:
+    alignments[id] = DAC_Align_8b_R;
+    break;
+  case 12:
+    alignments[id] = DAC_Align_12b_R;
+    break;
+  case 16:
+    alignments[id] = DAC_Align_12b_L;
+    break;
+  default:
+    return DAC_INIT_BAD_BITS_PER_SAMPLE;
+  }
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
+  DAC_DeInit();
+  DAC_InitTypeDef dac_init_struct;
+  DAC_StructInit(&dac_init_struct);
+  DAC_Init(dac_channel, &dac_init_struct);
+  DAC_Cmd(dac_channel, ENABLE);
+  return 0;
+}
+
+void platform_dac_put_sample(unsigned channel_mask, unsigned *data) {
+  switch(channel_mask & 3) {
+  case 1:
+    DAC_SetChannel1Data(alignments[0], data[0]);
+    break;
+  case 2:
+    DAC_SetChannel2Data(alignments[1], data[0]);
+    break;
+  case 3:
+    DAC_SetDualChannelData(alignments[0], data[1], data[0]);
+    break;
+  default:
+    break;
+  }
+}
+
+int platform_dac_check_timer_id(unsigned id, unsigned timer_id) {
+  return timer_id >= 1 && timer_id <= 4;
+}
+
+// ****************************************************************************
+// generic DAC functions
 
 static unsigned bytes_per_sample[NUM_DAC];
 
@@ -313,15 +402,15 @@ static int dac_putsamples( lua_State *L )
 #include "lrodefs.h"  
 
 // Module function map
-const LUA_REG_TYPE dac_map[] = { 
+const LUA_REG_TYPE sa_dac_map[] = { 
   { LSTRKEY("setup"),  LFUNCVAL( dac_setup ) },
   { LSTRKEY("putsample"),  LFUNCVAL( dac_putsample ) },
   { LSTRKEY("putsamples"),  LFUNCVAL( dac_putsamples ) },
   { LNILKEY, LNILVAL }
 };
 
-LUALIB_API int luaopen_dac( lua_State *L ) {
-  LREGISTER( L, AUXLIB_ENC, dac_map );
+LUALIB_API int luaopen_sa_dac( lua_State *L )
+{
+  LREGISTER( L, AUXLIB_ENC, sa_dac_map );
 }  
 
-#endif // BUILD_DAC
