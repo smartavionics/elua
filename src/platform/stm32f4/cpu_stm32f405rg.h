@@ -7,5 +7,10 @@
 
 #include "cpu_stm32f407vg.h"
 
+#undef NUM_PIO
+#define NUM_PIO               4
+#undef NUM_ADC
+#define NUM_ADC               16
+
 #endif // #ifndef __CPU_STM32F405RG_H__
 
