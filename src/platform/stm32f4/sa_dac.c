@@ -150,6 +150,7 @@ volatile static struct
   unsigned next_in;               // offset of next byte in sample buffer to be filled
   unsigned channels;              // number of channels
   unsigned stride;                // amount next_out is incremented by when a sample is consumed
+  unsigned scaling;               // multiply sample by this value before adding bias
   unsigned bias;                  // add this value to sample data before sending to the DAC
   unsigned dac_id;                // the id of the DAC
   unsigned timer_id;              // the id of the timer
@@ -175,12 +176,12 @@ static void dac_timer_int_handler( elua_int_resnum resnum )
         dac_mask |= 1 << (dac_state.dac_id + i);
         if( bytes_per_sample[dac_state.dac_id + i] == 1 )
         {
-          dac_vals[i] = dac_state.bias + dac_state.sample_buffer[dac_state.next_out];
+          dac_vals[i] = dac_state.bias + dac_state.scaling * *(s8 *)(dac_state.sample_buffer + dac_state.next_out) / 0x100;
           ++dac_state.next_out;
         }
         else
         {
-          dac_vals[i] = dac_state.bias + *(s16 *)(dac_state.sample_buffer + dac_state.next_out);
+          dac_vals[i] = dac_state.bias + dac_state.scaling * *(s16 *)(dac_state.sample_buffer + dac_state.next_out) / 0x10000;
           dac_state.next_out += 2;
         }
         if ( dac_state.next_out >= dac_state.sample_buffer_size )
@@ -200,7 +201,7 @@ static void dac_timer_int_handler( elua_int_resnum resnum )
   }
 }
 
-// Lua: num_samples_output, num_underflows = putsamples( dac_id, data_source, rate, [bits_per_sample, [channels, [bias, [timer_id]]]] )
+// Lua: num_samples_output, num_underflows = putsamples( dac_id, data_source, rate, [bits_per_sample, [channels, [scaling, [bias, [timer_id]]]]] )
 static int dac_putsamples( lua_State *L )
 {
   dac_state.dac_id = luaL_checkinteger( L, 1 );
@@ -219,12 +220,16 @@ static int dac_putsamples( lua_State *L )
   dac_state.channels = luaL_optinteger( L, 5, 1 );
   if ( dac_state.channels < 1 || (dac_state.dac_id + dac_state.channels > NUM_DAC) )
     return luaL_error( L, "channels must be between 1 and %d", NUM_DAC - dac_state.dac_id );
-  dac_state.bias = luaL_optinteger( L, 6, 0 );
+
+  unsigned scaling_percent = luaL_optinteger( L, 6, 100 );
+  if ( scaling_percent > 100 )
+    scaling_percent = 100;
+  dac_state.bias = luaL_optinteger( L, 7, 0 );
 
   unsigned default_timer_id = 0;
   while ( default_timer_id < NUM_TIMER && !platform_dac_check_timer_id( dac_state.dac_id, default_timer_id ) )
     ++default_timer_id;
-  dac_state.timer_id = luaL_optinteger( L, 7, default_timer_id );
+  dac_state.timer_id = luaL_optinteger( L, 8, default_timer_id );
   MOD_CHECK_TIMER( dac_state.timer_id );
   MOD_CHECK_RES_ID( dac, dac_state.dac_id, timer, dac_state.timer_id );
 
@@ -235,9 +240,11 @@ static int dac_putsamples( lua_State *L )
       int result = platform_dac_init( dac_state.dac_id + i, bits_per_sample, 0 );
       if ( result != DAC_INIT_OK )
         return luaL_error( L, "DAC initialisation failed (%d)", result );
-      bytes_per_sample[dac_state.dac_id] = (bits_per_sample + 7) / 8;
+      bytes_per_sample[dac_state.dac_id + i] = (bits_per_sample + 7) / 8;
     }
   }
+
+  dac_state.scaling = (1 << bytes_per_sample[dac_state.dac_id] * 8) * scaling_percent / 100;
 
   dac_state.stride = bytes_per_sample[dac_state.dac_id] * dac_state.channels;
 
