@@ -96,9 +96,18 @@ static void pwms_init();
 #endif
 
 static void eth_init();
+
+#ifdef BUILD_ADC
 static void adcs_init();
+#endif
+
+#ifdef BUILD_CAN
 static void cans_init();
+#endif
+
+#ifdef BUILD_USB_CDC
 static void usb_init();
+#endif
 
 int platform_init()
 {
@@ -338,7 +347,7 @@ u32 platform_can_setup( unsigned id, u32 clock )
   return clock;
 }
 
-void platform_can_send( unsigned id, u32 canid, u8 idtype, u8 len, const u8 *data )
+int platform_can_send( unsigned id, u32 canid, u8 idtype, u8 len, const u8 *data )
 {
   tCANMsgObject msg_tx;
   const char *s = ( char * )data;
@@ -362,6 +371,8 @@ void platform_can_send( unsigned id, u32 canid, u8 idtype, u8 len, const u8 *dat
 
   can_tx_flag = 1;
   CANMessageSet(CAN0_BASE, CAN_MSG_OBJ_TX, &msg_tx, MSG_OBJ_TYPE_TX);
+
+  return PLATFORM_OK;
 }
 
 int platform_can_recv( unsigned id, u32 *canid, u8 *idtype, u8 *len, u8 *data )
@@ -516,6 +527,10 @@ u32 platform_uart_setup( unsigned id, u32 baud, int databits, int parity, int st
       config |= UART_CONFIG_PAR_EVEN;
     else if( parity == PLATFORM_UART_PARITY_ODD )
       config |= UART_CONFIG_PAR_ODD;
+    else if( parity == PLATFORM_UART_PARITY_MARK )
+      config |= UART_CONFIG_PAR_ONE;
+    else if( parity == PLATFORM_UART_PARITY_SPACE )
+      config |= UART_CONFIG_PAR_ZERO;
     else
       config |= UART_CONFIG_PAR_NONE;
 
