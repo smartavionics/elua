@@ -403,6 +403,15 @@ static int dac_putsamples( lua_State *L )
   return 2;
 }
 
+// Lua: setscaling( scaling )
+static int dac_setscaling( lua_State *L )
+{
+  unsigned scaling_percent = luaL_optinteger( L, 1, 100 );
+  dac_state.scaling = (1 << bytes_per_sample[dac_state.dac_id] * 8) * scaling_percent / 100;
+
+  return 0;
+}
+
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"  
 
@@ -411,6 +420,7 @@ const LUA_REG_TYPE sa_dac_map[] = {
   { LSTRKEY("setup"),  LFUNCVAL( dac_setup ) },
   { LSTRKEY("putsample"),  LFUNCVAL( dac_putsample ) },
   { LSTRKEY("putsamples"),  LFUNCVAL( dac_putsamples ) },
+  { LSTRKEY("setscaling"),  LFUNCVAL( dac_setscaling ) },
   { LNILKEY, LNILVAL }
 };
 
