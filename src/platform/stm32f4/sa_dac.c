@@ -29,16 +29,12 @@ int platform_dac_exists(unsigned id) {
 #define DAC_INIT_BAD_BITS_PER_SAMPLE -2
 #define DAC_INIT_BAD_OPTION          -3
 
-int  platform_dac_init( unsigned id, unsigned bits_per_sample, unsigned options );
-void platform_dac_put_sample( unsigned channel_mask, unsigned *data );
-int  platform_dac_check_timer_id( unsigned id, unsigned timer_id );
-
 // ****************************************************************************
 // platform DAC functions
 
 static uint32_t alignments[NUM_DAC] = { DAC_Align_8b_R, DAC_Align_8b_R };
 
-int platform_dac_init(unsigned id, unsigned bits_per_sample, unsigned options) {
+static int platform_dac_init(unsigned id, unsigned bits_per_sample, unsigned initial_value) {
   unsigned dac_channel = 0;
   GPIO_InitTypeDef GPIO_init_struct;
   GPIO_init_struct.GPIO_Mode = GPIO_Mode_AN;
@@ -74,11 +70,19 @@ int platform_dac_init(unsigned id, unsigned bits_per_sample, unsigned options) {
   DAC_InitTypeDef dac_init_struct;
   DAC_StructInit(&dac_init_struct);
   DAC_Init(dac_channel, &dac_init_struct);
+  switch(id) {
+  case 0:
+    DAC_SetChannel1Data(alignments[id], initial_value);
+    break;
+  case 1:
+    DAC_SetChannel2Data(alignments[id], initial_value);
+    break;
+  }
   DAC_Cmd(dac_channel, ENABLE);
   return 0;
 }
 
-void platform_dac_put_sample(unsigned channel_mask, unsigned *data) {
+static void platform_dac_put_sample(unsigned channel_mask, unsigned *data) {
   switch(channel_mask & 3) {
   case 1:
     DAC_SetChannel1Data(alignments[0], data[0]);
@@ -94,7 +98,7 @@ void platform_dac_put_sample(unsigned channel_mask, unsigned *data) {
   }
 }
 
-int platform_dac_check_timer_id(unsigned id, unsigned timer_id) {
+static int platform_dac_check_timer_id(unsigned id, unsigned timer_id) {
   return timer_id >= 1 && timer_id <= 4;
 }
 
@@ -103,15 +107,16 @@ int platform_dac_check_timer_id(unsigned id, unsigned timer_id) {
 
 static unsigned bytes_per_sample[NUM_DAC];
 
-// Lua: setup( dac_id, [bits_per_sample] )
+// Lua: setup( dac_id, [bits_per_sample, [initial_value]] )
 static int dac_setup( lua_State *L )
 {
   unsigned id = luaL_checkinteger( L, 1 );
   MOD_CHECK_ID( dac, id );
 
   unsigned bits_per_sample = luaL_optinteger( L, 2, 8 );
+  unsigned initial_value = luaL_optinteger( L, 3, 0 );
 
-  int result = platform_dac_init( id, bits_per_sample, 0 );
+  int result = platform_dac_init( id, bits_per_sample, initial_value );
   if ( result != DAC_INIT_OK )
     return luaL_error( L, "DAC initialisation failed (%d)", result );
 
@@ -237,7 +242,7 @@ static int dac_putsamples( lua_State *L )
     int i;
     for ( i = 0; i < dac_state.channels; ++i )
     {
-      int result = platform_dac_init( dac_state.dac_id + i, bits_per_sample, 0 );
+      int result = platform_dac_init( dac_state.dac_id + i, bits_per_sample, dac_state.bias );
       if ( result != DAC_INIT_OK )
         return luaL_error( L, "DAC initialisation failed (%d)", result );
       bytes_per_sample[dac_state.dac_id + i] = (bits_per_sample + 7) / 8;
